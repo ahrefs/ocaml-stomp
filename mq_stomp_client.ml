@@ -1,6 +1,5 @@
 (* Copyright (c) 2009 Mauricio Fernández <mfp@acm.org> *)
 open ExtString
-open Printf
 open Mq
 
 module Make_generic(C : Mq_concurrency.THREAD) =
@@ -10,7 +9,6 @@ struct
 
   type 'a thread = 'a C.t
   type transaction = string
-  type message_id = string
 
   type receipt = {
     r_headers : (string * string) list;
@@ -147,9 +145,12 @@ struct
   let establish_conn msg sockaddr eof_nl =
     catch
       (fun () -> open_connection sockaddr)
-      (function
-           Unix.Unix_error (Unix.ECONNREFUSED, _, _) | Sys_error _ ->
-             error Abort (Connection_error Connection_refused) msg
+      (let abort () = error Abort (Connection_error Connection_refused) msg in
+       function
+           Unix.Unix_error (uerr, _, _) when uerr = Unix.ECONNREFUSED ->
+             abort ()
+         | Sys_error _ ->
+             abort ()
          | e -> fail e)
     >>= fun (c_in, c_out) ->
     return { c_in = c_in; c_out = c_out; c_closed = false; c_transactions = S.empty;
@@ -187,7 +188,11 @@ struct
         (function
              (* if there's a connection error, such as the other end closing
               * before us, ignore it, as we wanted to close the conn anyway *)
-             Message_queue_error (_, _, Connection_error _) -> return ()
+             Message_queue_error (_, _, mqe) as e -> begin
+               match mqe with
+               | Connection_error _ -> return ()
+               | Protocol_error _ -> fail e
+             end
            | e -> fail e)
 
   let check_closed msg conn =
@@ -216,7 +221,9 @@ struct
       | t ->
          error Reconnect (Protocol_error t) "Mq_stomp_client.%s: no RECEIPT received." msg
 
-  let check_receipt msg conn rid = get_receipt msg conn rid >>= fun receipt -> return ()
+  let check_receipt msg conn rid =
+    get_receipt msg conn rid >>= fun _receipt ->
+    return ()
 
   let send_frame_with_receipt msg conn command hs body =
     check_closed msg conn >>= fun () ->

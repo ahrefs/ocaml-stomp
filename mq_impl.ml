@@ -73,13 +73,18 @@ struct
         catch
           (fun () -> do_set_conn ())
           (function
-               Message_queue_error (_, _, Connection_error (Connection_refused | Closed)) ->
-                 C.sleep 1. >>= fun () ->
-                 set_conn ()
+               Message_queue_error (_, _, mqe) as e -> begin
+                 match mqe with
+                 | Connection_error (Connection_refused | Closed) ->
+                     C.sleep 1. >>= fun () ->
+                     set_conn ()
+                 | Connection_error Access_refused
+                 | Protocol_error _ -> fail e
+               end
              | e -> fail e)
       in match conn with
           None -> set_conn ()
-        | Some c -> self#disconnect >>= fun () -> set_conn ()
+        | Some _c -> self#disconnect >>= fun () -> set_conn ()
 
     method reconnect = self#reopen_conn
 
@@ -89,9 +94,13 @@ struct
           (fun () -> f c)
           (function
                (* FIXME: retry only N times? *)
-               Message_queue_error (Retry, _, _) -> doit c
-             | Message_queue_error (Reconnect, _, _) ->
-                 self#reopen_conn >>= fun () -> self#with_conn f
+               Message_queue_error (restartable, _, _) as e -> begin
+                 match restartable with
+                 | Retry -> doit c
+                 | Reconnect ->
+                     self#reopen_conn >>= fun () -> self#with_conn f
+                 | Abort -> fail e
+               end
              | e -> fail e)
       in match conn with
           None -> self#reopen_conn >>= fun () -> self#with_conn f

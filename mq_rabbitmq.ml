@@ -7,8 +7,6 @@ struct
 
   let rng = Cryptokit.Random.device_rng "/dev/urandom"
 
-  type t = string
-
   let create () =
     let s = String.create 16 in
       rng#random_bytes s 0 (String.length s);
@@ -74,12 +72,12 @@ struct
   let normal_headers = ["content-type", "application/octet-stream"]
   let topic_headers = ["exchange", "amq.topic"] @ normal_headers
 
-  let send conn ?transaction ?ack_timeout ~destination body =
+  let send conn ?transaction ?ack_timeout:_ ~destination body =
     B.send conn.c_conn ?transaction
       ~headers:normal_headers
       ~destination:("/queue/" ^ destination) body
 
-  let send_no_ack conn ?transaction ?ack_timeout ~destination body =
+  let send_no_ack conn ?transaction ?ack_timeout:_ ~destination body =
     B.send_no_ack conn.c_conn ?transaction
       ~headers:normal_headers
       ~destination:("/queue/" ^ destination) body
@@ -110,8 +108,12 @@ struct
         (fun () -> subscribe_queue c queue >>= fun () -> disconnect c)
         (function
              (* FIXME: limit number of attempts? *)
-           | Message_queue_error (Retry, _, _) -> try_to_create c
-           | Message_queue_error (Reconnect, _, _) -> create_queue conn queue
+           | Message_queue_error (restartable, _, _) as e -> begin
+               match restartable with
+               | Retry -> try_to_create c
+               | Reconnect -> create_queue conn queue
+               | Abort -> fail e
+             end
            | e -> fail e)
     in connect conn.c_addr ~prefetch:1
          ~login:conn.c_login ~passcode:conn.c_passcode >>= try_to_create
@@ -135,7 +137,7 @@ struct
           conn.c_topic_ids <- M.remove topic conn.c_topic_ids;
           return ()
 
-  let queue_size conn queue = return None
-  let queue_subscribers conn queue = return None
-  let topic_subscribers conn topic = return None
+  let queue_size _conn _queue = return None
+  let queue_subscribers _conn _queue = return None
+  let topic_subscribers _conn _topic = return None
 end

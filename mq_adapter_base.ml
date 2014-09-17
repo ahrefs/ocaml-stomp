@@ -40,12 +40,12 @@ struct
       c_prefetch = prefetch;
     }
 
-  let send conn ?transaction ?ack_timeout ~destination body =
+  let send conn ?transaction ?ack_timeout:_ ~destination body =
     B.send conn.c_conn ?transaction
       ~headers:["persistent", "true"]
       ~destination:("/queue/" ^ destination) body
 
-  let send_no_ack conn ?transaction ?ack_timeout ~destination body =
+  let send_no_ack conn ?transaction ?ack_timeout:_ ~destination body =
     B.send_no_ack conn.c_conn ?transaction
       ~headers:["persistent", "true"]
       ~destination:("/queue/" ^ destination) body
@@ -58,14 +58,14 @@ struct
     B.send_no_ack conn.c_conn ?transaction
       ~destination:("/topic/" ^ destination) body
 
-  let subscribe_queue_aux ~headers conn ~auto_delete queue =
+  let subscribe_queue_aux ~headers conn ~auto_delete:(_) queue =
     B.subscribe conn.c_conn
       ~headers
       ("/queue/" ^ queue)
 
   let unsubscribe_queue conn queue = B.unsubscribe conn.c_conn ("/queue/" ^ queue)
 
-  let create_queue conn queue =
+  let create_queue _conn _queue =
     (* no need to create it as a durable queue, unlike rabbitmq *)
     return ()
 
@@ -86,7 +86,7 @@ struct
       return ()
     end
 
-  let queue_size conn queue = return None
-  let queue_subscribers conn queue = return None
-  let topic_subscribers conn topic = return None
+  let queue_size _conn _queue = return None
+  let queue_subscribers _conn _queue = return None
+  let topic_subscribers _conn _topic = return None
 end

@@ -99,7 +99,7 @@ let () =
         subs;
       if !nthreads <= 1 then printf "DONE             \n%!";
       (try
-        for i = 1 to num_msgs do
+        for _i = 1 to num_msgs do
           if !finish then raise Exit;
           let msg = S.receive_msg c in
             incr cnt;

@@ -35,7 +35,7 @@ let () =
     Arg.usage args msg;
     exit 1;
   end;
-  let c = S.connect !login !passcode
+  let c = S.connect ~login:!login ~passcode:!passcode
             (Unix.ADDR_INET (Unix.inet_addr_of_string !address, !port)) in
   let transaction = match !use_transaction with
       true -> Some (S.transaction_begin c)
