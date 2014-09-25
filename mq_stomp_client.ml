@@ -2,7 +2,7 @@
 open ExtString
 open Mq
 
-module Make_comm(M : Mq_concurrency.COMM) =
+module Make_comm'(M : Mq_concurrency.COMM) =
 struct
   module S = Set.Make(String)
   open M
@@ -91,7 +91,7 @@ struct
       List.assoc k l = v
     with Not_found -> false
 
-  let connect_internal ?login ?passcode ?(eof_nl = true) ?(headers = []) c =
+  let connect ?login ?passcode ?(eof_nl = true) ?(headers = []) c =
     let conn =
       { conn = c; c_closed = false; c_transactions = S.empty;
         c_eof_nl = eof_nl; c_pending_msgs = Queue.create ();
@@ -355,7 +355,7 @@ struct
 
   module Comm = Comm_of_thread(C)
 
-  module Impl = Make_comm(Comm)
+  module Impl = Make_comm'(Comm)
 
   include Impl
 
@@ -374,9 +374,18 @@ struct
              abort ()
          | e -> fail e)
 
+  type connect_addr = Unix.sockaddr
+
   let connect ?login ?passcode ?(eof_nl = true) ?(headers = []) sockaddr =
     establish_conn "Mq_stomp_client.connect" sockaddr >>= fun (c_in, c_out) ->
     let c = { Comm.c_in = c_in; c_out = c_out; c_eof_nl = eof_nl } in
-    connect_internal ?login ?passcode ~eof_nl ~headers c
+    connect ?login ?passcode ~eof_nl ~headers c
 
+end
+
+module Make_comm(M : Mq_concurrency.COMM) =
+struct
+  module Impl = Make_comm'(M)
+  include Impl
+  type connect_addr = M.conn
 end

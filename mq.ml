@@ -59,8 +59,10 @@ module type GENERIC =
 sig
   include BASE
 
+  type connect_addr
+
   val connect : ?login:string -> ?passcode:string -> ?eof_nl:bool ->
-    ?headers:(string * string) list -> Unix.sockaddr -> connection thread
+    ?headers:(string * string) list -> connect_addr -> connection thread
   val send : connection -> ?transaction:transaction -> ?persistent:bool ->
     destination:string -> ?headers:(string * string) list -> string -> unit thread
   val send_no_ack : connection -> ?transaction:transaction -> ?persistent:bool ->
@@ -68,6 +70,27 @@ sig
 
   val subscribe : connection -> ?headers:(string * string) list -> string -> unit thread
   val unsubscribe : connection -> ?headers:(string * string) list -> string -> unit thread
+
+  (** [expect_receipt conn rid] notifies that receipts whose receipt-id is
+    * [rid] are to be stored and will be consumed with [receive_receipt]. *)
+  val expect_receipt : connection -> string -> unit
+
+  type receipt = {
+    r_headers : (string * string) list;
+    r_body : string;
+  }
+
+  (** [receive_receipt conn rid] blocks until a RECEIPT with the given
+    * receipt-id is received. You must use [expect_receipt] before, or the
+    * RECEIPT might be discarded (resulting in receive_receipt blocking
+    * forever). If an error occurs, the RECEIPT will be discarded if received
+    * at any later point in time. (This is meant to prevent memleaks.) *)
+  val receive_receipt : connection -> string -> receipt thread
+
+  (** Return a unique receipt id. *)
+  val receipt_id : unit -> string
+  (** Return a unique transaction id. *)
+  val transaction_id : unit -> string
 end
 
 (** Higher-level message queue, with queue and topic abstractions. *)
