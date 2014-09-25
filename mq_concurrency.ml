@@ -139,3 +139,18 @@ module Green_thread : THREAD
   let close_out_noerr ch = catch (fun () -> close_out ch) (fun _ -> return ())
 end
 
+(** Message-oriented module interface. *)
+
+module type COMM =
+sig
+  type 'a t
+  val return : 'a -> 'a t
+  val ( >>= ) : 'a t -> ('a -> 'b t) -> 'b t
+  val fail : exn -> 'a t
+  val catch : (unit -> 'a t) -> (exn -> 'a t) -> 'a t
+
+  type conn
+  val send : conn -> Mq.stomp_frame -> unit t
+  val recv : conn -> Mq.stomp_frame t
+  val close : conn -> unit t
+end

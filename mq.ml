@@ -9,6 +9,9 @@ type received_msg = {
   msg_body : string
 }
 
+(** Type of STOMP frame. *)
+type stomp_frame = (string * (string * string) list * string)
+
 (** {3 Errors } *)
 
 (** Suggested error recovery strategy. *)
@@ -19,7 +22,7 @@ type connection_error = Access_refused | Connection_refused | Closed
 
 type message_queue_error =
     Connection_error of connection_error
-  | Protocol_error of (string * (string * string) list * string)
+  | Protocol_error of stomp_frame
 
 (* Exception raised by MQ client operations. *)
 exception Message_queue_error of restartable * string * message_queue_error
