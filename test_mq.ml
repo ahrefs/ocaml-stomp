@@ -12,7 +12,7 @@ let addr = ref "127.0.0.1"
 let port = ref 61613
 
 let make_mq prefetch =
-  M.make_tcp_message_queue ~prefetch ~login:!login ~passcode:!passcode !addr !port
+  M.make_tcp_mq ~prefetch ~login:!login ~passcode:!passcode !addr !port
 
 let wrap_test2 ?(prefetch = 1) f () =
   let mq1, mq2 = make_mq prefetch, make_mq prefetch in

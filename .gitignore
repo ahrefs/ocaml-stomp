@@ -20,4 +20,5 @@ OMake*.omc
 /test_receive
 /test_send
 /test_send_rabbitmq
+/test_mq
 /doc

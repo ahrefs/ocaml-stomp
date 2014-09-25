@@ -78,13 +78,17 @@ let () =
   let t0 = Unix.gettimeofday () in
   let print_rate () =
     let dt = Unix.gettimeofday () -. t0 in
-      printf "\n\nSent %8.1f messages/second.\n" (float !cnt /. dt) in
+      printf "\n\nSent %8.1f messages/second.\n%!" (float !cnt /. dt) in
 
   let finish = ref false in
   let run n =
+    let (!*) x = (Option.default "*" !x) in
+    if !verbose then printf "Connecting to %s:%s@%s:%d\n%!" !*login !*passcode !address !port;
     let c = S.connect ?login:!login ?passcode:!passcode ~eof_nl:!use_nl_eof
               (Unix.ADDR_INET (Unix.inet_addr_of_string !address, !port))
-    in try
+    in
+    if !verbose then printf "Connected to %s:%s@%s:%d\n%!" !*login !*passcode !address !port;
+    try
       for i = 1 to n do
         if !verbose && !cnt mod 11 = 0 then printf "%d      \r%!" !cnt;
         if !no_ack then
@@ -108,13 +112,13 @@ let () =
             Sys.set_signal Sys.sigint
               (Sys.Signal_handle (fun _ -> print_rate (); exit 1))));
     begin match !num_queues with
-        None -> printf "Sending to %s\n" !queue
-      | Some n -> printf "Sending to at most %d queues of prefix %s-\n" n !queue
+      | None -> printf "Sending to %s\n%!" !queue
+      | Some n -> printf "Sending to at most %d queues of prefix %s-\n%!" n !queue
     end;
     begin match !nthreads with
-        n when n <= 1 -> run !num_msgs
+      | n when n <= 1 -> run !num_msgs
       | n ->
           let ts = List.init n (fun _ -> Thread.create run (!num_msgs / n)) in
             List.iter Thread.join ts
     end;
-    print_rate ();
+    print_rate ()
