@@ -69,6 +69,14 @@ DEFAULT = stomp.cma stomp.cmxa
 .PHONY: all
 all: toplevel $(DEFAULT)
 
+.PHONY: install
+install: META stomp.cma stomp.cmxa
+    ocamlfind install stomp META $(filter-out test%, $(ls *.cmi)) *.mli stomp.cma stomp.cmxa stomp.a
+
+.PHONY: remove
+remove: META
+    ocamlfind remove stomp
+
 section
     OCAMLPACKS[] += threads.posix
     SOURCES = $(filter-exists $(addsuffixes .ml .mli, $(LIBOBJS)))

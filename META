@@ -1,0 +1,4 @@
+version="git"
+requires="lwt lwt.unix extlib cryptokit threads"
+archive(byte)="stomp.cma"
+archive(native)="stomp.cmxa"
