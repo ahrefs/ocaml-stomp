@@ -4,6 +4,11 @@
 
     Make is parametrized by [LWT_COMM], part of signature of Lwt_comm module
     from lwt_comm library.
+
+    Note: [Make(Lwt_comm).connect] has argument [?eof_nl], it is present for
+    signature compatibility, and ignored by [connect].  [?eof_nl] determines
+    framing rules on sockets.  Interprocess communications don't [de]serialize
+    stomp frames and touch sockets at all, so argument is not used actually.
  *)
 
 module type LWT_COMM =
@@ -20,7 +25,11 @@ sig
     ('req, 'resp, 'k) conn
 end
 
-module Make (C : LWT_COMM) =
+module Make (C : LWT_COMM) : Mq.GENERIC
+  with type 'a thread = 'a Lwt.t
+   and type connect_addr =
+    (Mq.stomp_frame, Mq.stomp_frame, [ `Bidi | `Connect ]) C.server
+ =
 struct
 
   module Comm = struct
@@ -36,11 +45,15 @@ struct
     let send = C.send
   end
 
-  module Impl = Mq_stomp_client.Make_comm(Comm)
+  module Impl = Mq_stomp_client_gen.Make_comm'(Comm)
 
   include Impl
 
-  let connect ?login ?passcode ?headers server =
+  type connect_addr =
+    (Mq.stomp_frame, Mq.stomp_frame, [ `Bidi | `Connect ]) C.server
+
+  let connect ?login ?passcode ?eof_nl ?headers server =
+    ignore (eof_nl : bool option);
     let conn = C.connect ~ack_req:false ~ack_resp:false server in
     connect ?login ?passcode ?headers conn
 

@@ -37,6 +37,7 @@ LIBOBJS[] =
 	mq_activemq
 	mq_ocamlmq
 	mq_adapter_base
+	mq_stomp_client_gen
 	mq_stomp_client
 	mq_stomp_client_comm
 
