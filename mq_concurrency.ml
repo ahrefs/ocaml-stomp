@@ -154,3 +154,25 @@ sig
   val recv : conn -> Mq.stomp_frame t
   val close : conn -> unit t
 end
+
+(** Type of module that provides locks/mutexes. *)
+
+module type MUTEX =
+sig
+  type 'a thread
+
+  type t
+  val create : unit -> t
+  val lock : t -> unit thread
+  val unlock : t -> unit
+end
+
+module Mutex_lwt : MUTEX with type 'a thread = 'a Lwt.t = struct
+  type 'a thread = 'a Lwt.t
+  include Lwt_mutex
+end
+
+module Mutex_posix : MUTEX with type 'a thread = 'a = struct
+  type 'a thread = 'a
+  include Mutex
+end

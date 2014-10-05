@@ -17,3 +17,13 @@ sig
   include Mq.GENERIC with type 'a thread = 'a C.t
     and type connect_addr = C.conn
 end
+
+module Lock_generic
+  (C : Mq_concurrency.THREAD)
+  (G : Mq.GENERIC with type 'a thread = 'a C.t)
+  (M : Mq_concurrency.MUTEX with type 'a thread = 'a C.t)
+ : Mq.GENERIC with
+     type 'a thread = 'a C.t
+ and type connect_addr = G.connect_addr
+ and type transaction = G.transaction
+ and type receipt = G.receipt

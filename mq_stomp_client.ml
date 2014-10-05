@@ -122,3 +122,93 @@ struct
   include Impl
   type connect_addr = M.conn
 end
+
+module Lock_generic
+  (C : Mq_concurrency.THREAD)
+  (G : Mq.GENERIC with type 'a thread = 'a C.t)
+  (M : Mq_concurrency.MUTEX with type 'a thread = 'a C.t)
+ : Mq.GENERIC with
+     type 'a thread = 'a C.t
+ and type connect_addr = G.connect_addr
+ and type transaction = G.transaction
+ and type receipt = G.receipt
+ =
+struct
+
+  type 'a thread = 'a G.thread
+  type connection =
+    { c : G.connection;
+      m : M.t;
+    }
+  type transaction = G.transaction
+
+  open C
+
+  let with_lock conn func =
+    M.lock conn.m >>= fun () ->
+    C.catch
+      (fun () ->
+         func conn.c >>= fun a ->
+         return (`Ok a)
+      )
+      (fun e -> return (`Error e))
+    >>= fun res ->
+    M.unlock conn.m;
+    match res with
+    | `Ok a -> return a
+    | `Error e -> fail e
+
+  let transaction_begin c = with_lock c G.transaction_begin
+  let transaction_commit c t = with_lock c (fun c -> G.transaction_commit c t)
+  let transaction_commit_all c = with_lock c G.transaction_commit_all
+  let transaction_abort_all c = with_lock c G.transaction_abort_all
+  let transaction_abort c t = with_lock c (fun c -> G.transaction_abort c t)
+
+  let receive_msg c = with_lock c G.receive_msg
+
+  let ack_msg c ?transaction msg = with_lock c
+    (fun c -> G.ack_msg c ?transaction msg)
+
+  let ack c ?transaction msg_id = with_lock c
+    (fun c -> G.ack c ?transaction msg_id)
+
+  let disconnect c = with_lock c G.disconnect
+
+  type connect_addr = G.connect_addr
+
+  let connect ?login ?passcode ?eof_nl ?headers addr =
+    G.connect ?login ?passcode ?eof_nl ?headers addr >>= fun c ->
+    return { c = c; m = M.create () }
+
+  let send c ?transaction ?persistent ~destination ?headers msg =
+    with_lock c begin fun c ->
+      G.send c ?transaction ?persistent ~destination ?headers msg
+    end
+
+  let send_no_ack c ?transaction ?persistent ~destination ?headers msg =
+    with_lock c begin fun c ->
+      G.send_no_ack c ?transaction ?persistent ~destination ?headers msg
+    end
+
+  let subscribe c ?headers dest = with_lock c begin fun c ->
+    G.subscribe c ?headers dest
+  end
+
+  let unsubscribe c ?headers dest = with_lock c begin fun c ->
+    G.unsubscribe c ?headers dest
+  end
+
+  let expect_receipt c rid = G.expect_receipt c.c rid
+
+  type receipt = G.receipt = {
+    r_headers : (string * string) list;
+    r_body : string;
+  }
+
+  let receive_receipt c rid = with_lock c (fun c -> G.receive_receipt c rid)
+
+  let receipt_id = G.receipt_id
+
+  let transaction_id = G.transaction_id
+
+end
