@@ -120,9 +120,10 @@ module Green_thread : THREAD
    and type in_channel = Lwt_chan.in_channel
    and type out_channel = Lwt_chan.out_channel
 = struct
-  include Lwt_util
   include Lwt_chan
   include Lwt
+
+  let iter_serial = Lwt_list.iter_s
 
   let sleep = Lwt_unix.sleep
 
