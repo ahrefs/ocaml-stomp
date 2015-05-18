@@ -134,9 +134,10 @@ struct
         "Mq_stomp_client.%s: closed connection" msg
     else return ()
 
-  let transaction_header = function
-      None -> []
-    | Some t -> ["transaction", t]
+  let add_transaction_header t_opt headers =
+    match t_opt with
+    | None -> headers
+    | Some t -> ("transaction", t) :: headers
 
   let rec get_receipt msg conn rid =
     receive_non_message_frame msg conn >>= function
@@ -166,19 +167,29 @@ struct
     check_closed msg conn >>= fun () ->
     send_frame' msg conn (command, hs, body)
 
-  let send_headers transaction persistent destination =
+  let make_send_headers ~headers ~transaction ~persistent ~destination =
+    let headers = List.filter begin fun (h, _v) ->
+        match h with
+        | "destination" | "persistent" | "transaction" | "content-length"
+        | "message-id" -> false
+        | _ -> true
+      end
+      headers
+    in
     ("destination", destination) :: ("persistent", string_of_bool persistent) ::
-    transaction_header transaction
+    add_transaction_header transaction headers
 
   let send_no_ack conn
         ?transaction ?(persistent = true) ~destination ?(headers = []) body =
     check_closed "send_no_ack" conn >>= fun () ->
-    let headers = headers @ send_headers transaction persistent destination in
+    let headers =
+      make_send_headers ~headers ~transaction ~persistent ~destination in
     send_frame_clength' "send_no_ack" conn "SEND" headers body
 
   let send conn ?transaction ?(persistent = true) ~destination ?(headers = []) body =
     check_closed "send" conn >>= fun () ->
-    let headers = headers @ send_headers transaction persistent destination in
+    let headers =
+      make_send_headers ~headers ~transaction ~persistent ~destination in
       (* if given a transaction ID, don't try to get RECEIPT --- the message
        * will only be saved on COMMIT anyway *)
       match transaction with
@@ -207,11 +218,13 @@ struct
         | _ -> receive_msg conn (* try to get another frame *)
 
   let ack_msg conn ?transaction msg =
-    let headers = ("message-id", msg.msg_id) :: transaction_header transaction in
+    let headers = ("message-id", msg.msg_id) ::
+      add_transaction_header transaction [] in
     send_frame_with_receipt "ack_msg" conn "ACK" headers ""
 
   let ack conn ?transaction msgid =
-    let headers = ("message-id", msgid) :: transaction_header transaction in
+    let headers = ("message-id", msgid) ::
+      add_transaction_header transaction [] in
     send_frame_with_receipt "ack" conn "ACK" headers ""
 
   let subscribe conn ?(headers = []) s =
