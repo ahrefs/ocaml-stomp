@@ -212,3 +212,146 @@ struct
   let transaction_id = G.transaction_id
 
 end
+
+module Trace
+  (C : Mq_concurrency.THREAD)
+  (G : Mq.GENERIC with type 'a thread = 'a C.t)
+  (Config : sig val name : string end)
+ : Mq.GENERIC with
+     type 'a thread = 'a C.t
+ and type connect_addr = G.connect_addr
+ and type transaction = G.transaction
+ and type receipt = G.receipt
+ =
+struct
+
+  let next_cid =
+    let cur = ref 0 in
+    fun () ->
+      incr cur;
+      !cur
+
+  type 'a thread = 'a G.thread
+  type connection =
+    { c : G.connection;
+      cid : int;
+    }
+  type transaction = G.transaction
+
+  open C
+
+  let dbg cid funcname fmt =
+    let open Printf in
+    ksprintf begin fun s ->
+        eprintf "Trace: %s %i: %s: %s\n%!" Config.name cid funcname s
+      end
+      fmt
+
+  let trace conn funcname ?args ?res func =
+    dbg conn.cid funcname "enter%s"
+      (match args with None -> "" | Some a -> "; " ^ a);
+    C.catch
+      (fun () ->
+         func conn.c >>= fun a ->
+         return (`Ok a)
+      )
+      (fun e -> return (`Error e))
+    >>= fun r ->
+    match r with
+    | `Ok a ->
+        dbg conn.cid funcname "exit%s"
+          (match res with None -> "" | Some dump -> "; " ^ dump a);
+        return a
+    | `Error e ->
+        dbg conn.cid funcname "exit, error: %s" (Printexc.to_string e);
+        fail e
+
+  let transaction_begin c = trace c "transaction_begin" G.transaction_begin
+  let transaction_commit c t = trace c "transaction_commit" begin fun c ->
+    G.transaction_commit c t
+  end
+  let transaction_commit_all c = trace c "transaction_commit_all"
+    G.transaction_commit_all
+  let transaction_abort_all c = trace c "transaction_abort_all"
+    G.transaction_abort_all
+  let transaction_abort c t = trace c "transaction_abort" begin fun c ->
+    G.transaction_abort c t
+  end
+
+  let dump_headers headers =
+    "[" ^
+    String.concat "; "
+      (List.map (fun (n, v) -> Printf.sprintf "%s:%S" n v) headers) ^
+    "]"
+
+  let dump_msg msg =
+    Printf.sprintf "id:%S headers:%s body:%S"
+      msg.msg_id (dump_headers msg.msg_headers) msg.msg_body
+
+  let receive_msg c = trace c "receive_msg" G.receive_msg
+    ~res: dump_msg
+
+  let ack_msg c ?transaction msg = trace c "ack_msg"
+    (fun c -> G.ack_msg c ?transaction msg)
+    ~args: (dump_msg msg)
+
+  let ack c ?transaction msg_id = trace c "ack"
+    (fun c -> G.ack c ?transaction msg_id)
+    ~args: (Printf.sprintf "msg_id=%S" msg_id)
+
+  let disconnect c = trace c "disconnect" G.disconnect
+
+  type connect_addr = G.connect_addr
+
+  let connect ?login ?passcode ?eof_nl ?headers addr =
+    dbg 0 "connect" "enter";
+    G.connect ?login ?passcode ?eof_nl ?headers addr >>= fun c ->
+    let cid = next_cid () in
+    dbg cid "connect" "exit";
+    return { c = c; cid = cid }
+
+  let dump_optheaders_body ho b =
+    Printf.sprintf "headers:%s body=%S"
+      (match ho with None -> "None" | Some h -> dump_headers h)
+      b
+
+  let send c ?transaction ?persistent ~destination ?headers msg =
+    trace c "send" begin fun c ->
+      G.send c ?transaction ?persistent ~destination ?headers msg
+    end
+    ~args: (dump_optheaders_body headers msg)
+
+  let send_no_ack c ?transaction ?persistent ~destination ?headers msg =
+    trace c "send_no_ack" begin fun c ->
+      G.send_no_ack c ?transaction ?persistent ~destination ?headers msg
+    end
+    ~args: (dump_optheaders_body headers msg)
+
+  let dump_dest d = Printf.sprintf "dest:%S" d
+
+  let subscribe c ?headers dest = trace c "subscribe" begin fun c ->
+      G.subscribe c ?headers dest
+    end
+    ~args: (dump_dest dest)
+
+  let unsubscribe c ?headers dest = trace c "unsubscribe" begin fun c ->
+      G.unsubscribe c ?headers dest
+    end
+    ~args: (dump_dest dest)
+
+  let expect_receipt c rid = G.expect_receipt c.c rid
+
+  type receipt = G.receipt = {
+    r_headers : (string * string) list;
+    r_body : string;
+  }
+
+  let receive_receipt c rid = trace c "receive_receipt" begin
+    fun c -> G.receive_receipt c rid
+  end
+
+  let receipt_id = G.receipt_id
+
+  let transaction_id = G.transaction_id
+
+end

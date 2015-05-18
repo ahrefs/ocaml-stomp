@@ -27,3 +27,13 @@ module Lock_generic
  and type connect_addr = G.connect_addr
  and type transaction = G.transaction
  and type receipt = G.receipt
+
+module Trace
+  (C : Mq_concurrency.THREAD)
+  (G : Mq.GENERIC with type 'a thread = 'a C.t)
+  (Config : sig val name : string end)
+ : Mq.GENERIC with
+     type 'a thread = 'a C.t
+ and type connect_addr = G.connect_addr
+ and type transaction = G.transaction
+ and type receipt = G.receipt
