@@ -12,20 +12,51 @@ type received_msg = {
 (** Type of STOMP frame. *)
 type stomp_frame = (string * (string * string) list * string)
 
+let string_of_headers hs =
+  "[" ^
+  String.concat "; " (List.map (fun (k, v) -> Printf.sprintf "%S:%S" k v) hs) ^
+  "]"
+
+let string_of_stomp_frame (cmd, headers, body) =
+  Printf.sprintf "frame(%S %s %S)"
+    cmd (string_of_headers headers) body
+
 (** {3 Errors } *)
 
 (** Suggested error recovery strategy. *)
 type restartable = Retry | Reconnect | Abort
 
+let string_of_restartable = function
+  | Retry -> "Retry"
+  | Reconnect -> "Reconnect"
+  | Abort -> "Abort"
+
 (* Type of connection error. *)
 type connection_error = Access_refused | Connection_refused | Closed
+
+let string_of_connection_error = function
+  | Access_refused -> "Access_refused"
+  | Connection_refused -> "Connection_refused"
+  | Closed -> "Closed"
 
 type message_queue_error =
     Connection_error of connection_error
   | Protocol_error of stomp_frame
 
+let string_of_message_queue_error = function
+  | Connection_error e -> "Connection_error " ^ string_of_connection_error e
+  | Protocol_error f -> "Protocol_error " ^ string_of_stomp_frame f
+
 (* Exception raised by MQ client operations. *)
 exception Message_queue_error of restartable * string * message_queue_error
+
+let () = Printexc.register_printer begin function
+  | Message_queue_error (r, p, e) -> Some begin
+      Printf.sprintf "Mq.Message_queue_error(%s, %S, %s)"
+        (string_of_restartable r) p (string_of_message_queue_error e)
+    end
+  | _ -> None
+end
 
 (** {3 Module types} *)
 
