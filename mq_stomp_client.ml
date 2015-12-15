@@ -94,10 +94,10 @@ struct
 
   open C
 
-  let establish_conn msg sockaddr =
+  let establish_conn ?timeout msg sockaddr =
     catch
       (fun () ->
-         open_connection sockaddr
+         open_connection ?timeout sockaddr
       )
       (let abort () = error Abort (Connection_error Connection_refused) msg in
        function
@@ -109,8 +109,8 @@ struct
 
   type connect_addr = Unix.sockaddr
 
-  let connect ?login ?passcode ?(eof_nl = true) ?(headers = []) sockaddr =
-    establish_conn "Mq_stomp_client.connect" sockaddr >>= fun (c_in, c_out) ->
+  let connect ?login ?passcode ?(eof_nl = true) ?(headers = []) ?timeout sockaddr =
+    establish_conn "Mq_stomp_client.connect" ?timeout sockaddr >>= fun (c_in, c_out) ->
     let c = { Comm.c_in = c_in; c_out = c_out; c_eof_nl = eof_nl } in
     connect ?login ?passcode ~eof_nl ~headers c
 
@@ -176,8 +176,8 @@ struct
 
   type connect_addr = G.connect_addr
 
-  let connect ?login ?passcode ?eof_nl ?headers addr =
-    G.connect ?login ?passcode ?eof_nl ?headers addr >>= fun c ->
+  let connect ?login ?passcode ?eof_nl ?headers ?timeout addr =
+    G.connect ?login ?passcode ?eof_nl ?headers ?timeout addr >>= fun c ->
     return { c = c; m = M.create () }
 
   let send c ?transaction ?persistent ~destination ?headers msg =
@@ -303,9 +303,9 @@ struct
 
   type connect_addr = G.connect_addr
 
-  let connect ?login ?passcode ?eof_nl ?headers addr =
+  let connect ?login ?passcode ?eof_nl ?headers ?timeout addr =
     dbg 0 "connect" "enter";
-    G.connect ?login ?passcode ?eof_nl ?headers addr >>= fun c ->
+    G.connect ?login ?passcode ?eof_nl ?headers ?timeout addr >>= fun c ->
     let cid = next_cid () in
     dbg cid "connect" "exit";
     return { c = c; cid = cid }

@@ -32,8 +32,8 @@ struct
 
   let disconnect = delegate B.disconnect
 
-  let connect ?prefetch ~login ~passcode addr =
-    B.connect ~login ~passcode ~eof_nl:true addr >>= fun conn ->
+  let connect ?prefetch ~login ~passcode ?timeout addr =
+    B.connect ~login ~passcode ~eof_nl:true ?timeout addr >>= fun conn ->
     return {
       c_conn = conn; c_topics = S.empty;
       c_addr = addr; c_login = login; c_passcode = passcode;

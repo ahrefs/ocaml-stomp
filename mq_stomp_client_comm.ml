@@ -52,9 +52,9 @@ struct
   type connect_addr =
     (Mq.stomp_frame, Mq.stomp_frame, [ `Bidi | `Connect ]) C.server
 
-  let connect ?login ?passcode ?eof_nl ?headers server =
+  let connect ?login ?passcode ?eof_nl ?headers ?timeout server =
     ignore (eof_nl : bool option);
     let conn = C.connect ~ack_req:false ~ack_resp:false server in
-    connect ?login ?passcode ?headers conn
+    connect ?login ?passcode ?headers ?timeout conn
 
 end

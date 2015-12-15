@@ -49,7 +49,7 @@ struct
   type subscription = Queue of string | Topic of string
   module Sset = Set.Make(struct type t = subscription let compare = compare end)
 
-  class simple_queue ?prefetch ~login ~passcode addr =
+  class simple_queue ?prefetch ?connect_timeout ~login ~passcode addr =
   object(self)
     inherit [M.transaction] mq
     val mutable conn = None
@@ -61,7 +61,7 @@ struct
 
     method private reopen_conn =
       let do_set_conn () =
-        M.connect ?prefetch ~login ~passcode addr >>= fun c ->
+        M.connect ?prefetch ~login ~passcode ?timeout:connect_timeout addr >>= fun c ->
           conn <- Some c;
           self#with_conn
             (fun c -> iter_serial

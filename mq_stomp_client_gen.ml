@@ -91,7 +91,7 @@ struct
       List.assoc k l = v
     with Not_found -> false
 
-  let connect ?login ?passcode ?(eof_nl = true) ?(headers = []) c =
+  let connect ?login ?passcode ?(eof_nl = true) ?(headers = []) ?timeout c =
     let conn =
       { conn = c; c_closed = false; c_transactions = S.empty;
         c_eof_nl = eof_nl; c_pending_msgs = Queue.create ();
@@ -102,6 +102,7 @@ struct
         None, None -> headers
       | _ -> ("login", Option.default "" login) ::
              ("passcode", Option.default "" passcode) :: headers in
+    ignore timeout; (* todo: use timeout for stomp handshake too, not only for connect() *)
     send_frame' "connect" conn ("CONNECT", headers, "") >>= fun () ->
     receive_non_message_frame "connect" conn >>= function
         ("CONNECTED", _, _) -> return conn

@@ -16,7 +16,7 @@ sig
 
   type in_channel
   type out_channel
-  val open_connection : Unix.sockaddr -> (in_channel * out_channel) t
+  val open_connection : ?timeout:float -> Unix.sockaddr -> (in_channel * out_channel) t
   val output_char : out_channel -> char -> unit t
   val output_string : out_channel -> string -> unit t
   val flush : out_channel -> unit t
@@ -48,7 +48,9 @@ module Posix_thread : THREAD
   let sleep = Thread.delay
 
   include Pervasives
-  let open_connection = Unix.open_connection
+  let open_connection ?timeout sa =
+    ignore timeout; (* todo; raise Timeout *)
+    Unix.open_connection sa
   let catch f rescue = try f () with e -> rescue e
 
   type 'a pool = {
@@ -122,6 +124,14 @@ module Green_thread : THREAD
 = struct
   include Lwt_chan
   include Lwt
+
+  let open_connection ?timeout sa =
+    let timeout_thread =
+      match timeout with
+      | None -> []
+      | Some t -> [Lwt_unix.sleep t >>= fun () -> fail Mq.Timeout]
+    in
+    pick (open_connection sa :: timeout_thread)
 
   let iter_serial = Lwt_list.iter_s
 

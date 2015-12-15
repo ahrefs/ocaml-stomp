@@ -58,6 +58,8 @@ let () = Printexc.register_printer begin function
   | _ -> None
 end
 
+exception Timeout
+
 (** {3 Module types} *)
 
 (** Base MQ module. *)
@@ -93,7 +95,7 @@ sig
   type connect_addr
 
   val connect : ?login:string -> ?passcode:string -> ?eof_nl:bool ->
-    ?headers:(string * string) list -> connect_addr -> connection thread
+    ?headers:(string * string) list -> ?timeout:float -> connect_addr -> connection thread
   val send : connection -> ?transaction:transaction -> ?persistent:bool ->
     destination:string -> ?headers:(string * string) list -> string -> unit thread
   val send_no_ack : connection -> ?transaction:transaction -> ?persistent:bool ->
@@ -130,7 +132,7 @@ sig
   include BASE
 
   val connect :
-    ?prefetch:int -> login:string -> passcode:string -> Unix.sockaddr ->
+    ?prefetch:int -> login:string -> passcode:string -> ?timeout:float -> Unix.sockaddr ->
     connection thread
 
   (** Send and wait for ACK. *)

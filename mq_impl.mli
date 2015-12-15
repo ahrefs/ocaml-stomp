@@ -45,6 +45,7 @@ module Make :
 
     class simple_queue :
       ?prefetch:int ->
+      ?connect_timeout:float ->
       login:string ->
       passcode:string ->
       Unix.sockaddr ->

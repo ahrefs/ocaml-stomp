@@ -58,12 +58,12 @@ struct
 
   let disconnect = delegate B.disconnect
 
-  let connect ?prefetch ~login ~passcode addr =
+  let connect ?prefetch ~login ~passcode ?timeout addr =
     let headers = match prefetch with
         None -> []
       | Some n -> ["prefetch", string_of_int n]
     in
-      B.connect ~headers ~login ~passcode ~eof_nl:false addr >>= fun conn ->
+      B.connect ~headers ~login ~passcode ~eof_nl:false ?timeout addr >>= fun conn ->
       return {
         c_conn = conn; c_topic_ids = M.empty;
         c_addr = addr; c_login = login; c_passcode = passcode;
