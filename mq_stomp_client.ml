@@ -216,7 +216,7 @@ end
 module Trace
   (C : Mq_concurrency.THREAD)
   (G : Mq.GENERIC with type 'a thread = 'a C.t)
-  (Config : sig val name : string end)
+  (Config : sig val enabled : bool ref val name : string end)
  : Mq.GENERIC with
      type 'a thread = 'a C.t
  and type connect_addr = G.connect_addr
@@ -248,23 +248,27 @@ struct
       fmt
 
   let trace conn funcname ?args ?res func =
-    dbg conn.cid funcname "enter%s"
-      (match args with None -> "" | Some a -> "; " ^ a);
-    C.catch
-      (fun () ->
-         func conn.c >>= fun a ->
-         return (`Ok a)
-      )
-      (fun e -> return (`Error e))
-    >>= fun r ->
-    match r with
-    | `Ok a ->
-        dbg conn.cid funcname "exit%s"
-          (match res with None -> "" | Some dump -> "; " ^ dump a);
-        return a
-    | `Error e ->
-        dbg conn.cid funcname "exit, error: %s" (Printexc.to_string e);
-        fail e
+    if !Config.enabled
+    then begin
+      dbg conn.cid funcname "enter%s"
+        (match args with None -> "" | Some a -> "; " ^ a);
+      C.catch
+        (fun () ->
+           func conn.c >>= fun a ->
+           return (`Ok a)
+        )
+        (fun e -> return (`Error e))
+      >>= fun r ->
+      match r with
+      | `Ok a ->
+          dbg conn.cid funcname "exit%s"
+            (match res with None -> "" | Some dump -> "; " ^ dump a);
+          return a
+      | `Error e ->
+          dbg conn.cid funcname "exit, error: %s" (Printexc.to_string e);
+          fail e
+    end else
+      func conn.c
 
   let transaction_begin c = trace c "transaction_begin" G.transaction_begin
   let transaction_commit c t = trace c "transaction_commit" begin fun c ->
@@ -304,10 +308,10 @@ struct
   type connect_addr = G.connect_addr
 
   let connect ?login ?passcode ?eof_nl ?headers ?timeout addr =
-    dbg 0 "connect" "enter";
+    if !Config.enabled then dbg 0 "connect" "enter";
     G.connect ?login ?passcode ?eof_nl ?headers ?timeout addr >>= fun c ->
     let cid = next_cid () in
-    dbg cid "connect" "exit";
+    if !Config.enabled then dbg cid "connect" "exit";
     return { c = c; cid = cid }
 
   let dump_optheaders_body ho b =

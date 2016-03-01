@@ -31,7 +31,7 @@ module Lock_generic
 module Trace
   (C : Mq_concurrency.THREAD)
   (G : Mq.GENERIC with type 'a thread = 'a C.t)
-  (Config : sig val name : string end)
+  (Config : sig val enabled : bool ref val name : string end)
  : Mq.GENERIC with
      type 'a thread = 'a C.t
  and type connect_addr = G.connect_addr
